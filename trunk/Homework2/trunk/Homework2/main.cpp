@@ -18,18 +18,26 @@ int main()  {
 	// Some hardcoded test data
 	string name = "test.in";
 	string line1 = "712412913|Healey|Christopher|CSC";
+	string line2 = "123454321|Glenmoore|Alexander|MKT";
 	int size = line1.len();
 	fp.open(name, 'w');				// open file for writing
 	fp.write_raw( (char*) &size, sizeof(int));		// write record length
 	fp.write_raw(line1, line1.len());				// write record
+	size = line2.len();
+	fp.write_raw( (char*) &size, sizeof(int));		// write record length
+	fp.write_raw(line2, line2.len());				// write record
+
 	fp.close();										// close file
 
 	fp.open(name, 'r');								// open file for reading
 	fp.seek( offset, BEGIN);						// start at beginning
-	fp.read_raw( (char *) &count, sizeof( int ));	// read next record size
-	fp.read_raw(buffer, count);						// read record to buffer
-
-	cout << buffer << "\n";							// print buffer contents
+	while (1)  {
+		fp.read_raw( (char *) &count, sizeof( int ));	// read next record size
+		fp.read_raw(buffer, count);						// read record to buffer
+		if (fp.eof())									// to prevent last line from printing twice
+			break;										//   the lazy way
+		cout << buffer << "\n";							// print buffer contents
+	}
 
 	return 0;
 }
