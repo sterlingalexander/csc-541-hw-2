@@ -30,10 +30,9 @@ struct record {
 int main(int argc, char *argv[])  {
 
 	string name = argv[1];
-	cout << name << "\n";
 	filereader fp;
 	fp.open(name, 'w');
-	cout << "Pointer Returned\n";
+	cout << name << " was opened for writing\n";
 
 	char buffer[ 1024 ] = {};		// Initialize empty buffer
 	int count;						// Holds number of records to read
@@ -41,19 +40,19 @@ int main(int argc, char *argv[])  {
 	string cmd = "";
 	std::string contents = "";
 	while (1)  {
+		cout << "Please input command:  ";
 		getline(cin, contents, '\n');
 		string c2 = contents.c_str();
 		string token[5] = {};
 		c2.token(token,5);
-		cout << "Cmd entered was " << cmd << "\n";
 		if (token[0] == "add")  {
-			cout << "You entered " << token[1] << "\n";
+			cout << "ADD -- You entered " << token[1] << "\n";
 		}
 		else if (token[0] == "find")  {
-			cout << "You entered " << token[1] << "\n";
+			cout << "FIND -- You entered " << token[1] << "\n";
 		}
 		else if (token[0] == "del")  {
-			cout << "You entered " << token[1] << "\n";
+			cout << "DEL -- You entered " << token[1] << "\n";
 		}
 		else if (token[0] == "end")  {
 			cout << "Terminating program\n\n";
