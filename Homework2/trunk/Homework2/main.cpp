@@ -7,11 +7,13 @@
 #include "str.h"
 #include <list>
 #include <algorithm>
+#include <vector>
 
 using std::cin;
 using std::cout;
 using std::getline;
 using std::list;
+using std::vector;
 using std::sort;
 using std::ifstream;
 
@@ -31,14 +33,15 @@ struct avail_list {
 };
 
 void openFiles(string name, filereader &fp, filereader &index, filereader &available);
-void addToFile(string str, filereader &fp, list<file_index> &index, list<avail_list> &available);
-void readSupportStructures(filereader &index_file, list<file_index> &index_list,
-			filereader &available_file, list<avail_list> &available_list);
+void addToFile(string str, filereader &fp, vector<file_index> &index, vector<avail_list> &available);
+void readSupportStructures(filereader &index_file, vector<file_index> &index_list,
+			filereader &available_file, vector<avail_list> &available_list);
 list<int> findDelimiters(string str, char DELIM);
-int findOffset(list<avail_list> available, int rlen);
+int findOffset(vector<avail_list> available, int rlen);
 bool file_test(const char *filename);
 int fileSize(const char* name);
 bool index_cmp(const file_index& a, const file_index& b);
+avail_list find(const vector<file_index> &index, const string &target);
 
 int main(int argc, char *argv[])  {
 
@@ -46,8 +49,8 @@ int main(int argc, char *argv[])  {
 	filereader index_file;				// reader for index file
 	filereader available_file;			// reader for availability list
 	string name = argv[1];				// passed in file name
-	list<file_index> index_list;		// index list for fast PK location
-	list<avail_list> available_list;	// availability list of location of free space in db
+	vector<file_index> index_list;		// index list for fast PK location
+	vector<avail_list> available_list;	// availability list of location of free space in db
 	char buffer[ 1024 ] = {};			// Initialize empty buffer
 	long offset = 0;					// offset into file we are reading
 	string cmd = "";					// string for command
@@ -66,6 +69,7 @@ int main(int argc, char *argv[])  {
 			addToFile(token[1], fp, index_list, available_list);	// add record to db file
 		}
 		else if (token[0] == "find")  {
+			find(index_list, token[1]);
 			cout << "FIND -- You entered " << token[1] << "\n";		// find the requested record
 		}
 		else if (token[0] == "del")  {
@@ -86,12 +90,12 @@ int main(int argc, char *argv[])  {
 	// Now we need to write the contents of the index file.  We can use the same loop construct to 
 	//		write the availability list to the file.  Since we are writing them in binary, when we 
 	//		read in the index we can just read the key, offset pairs without using any delimiters.
-	for (list<file_index>::const_iterator i = index_list.begin(); i != index_list.end(); i++)  {
+	for (vector<file_index>::const_iterator i = index_list.begin(); i != index_list.end(); i++)  {
 		index_file.write_raw( (char*) &i->key, sizeof(int));
 		index_file.write_raw( (char*) &i->off, sizeof(long));
 	}
 
-	for (list<avail_list>::const_iterator i = available_list.begin(); i != available_list.end(); i++)  {
+	for (vector<avail_list>::const_iterator i = available_list.begin(); i != available_list.end(); i++)  {
 		available_file.write_raw( (char*) &i->off, sizeof(long));
 		available_file.write_raw( (char*) &i->size, sizeof(int));
 	}
@@ -103,7 +107,18 @@ int main(int argc, char *argv[])  {
 	return 0;
 }
 
-void addToFile(string str, filereader &fp, list<file_index> &index, list<avail_list> &available) {
+avail_list find(const vector<file_index> &index, const string &target)  {
+
+	int left = 0;
+	int right = index.size();
+	int mid = right / 2;
+	avail_list record;
+	while ( left <= right )  {
+	}
+	return record;
+}
+
+void addToFile(string str, filereader &fp, vector<file_index> &index, vector<avail_list> &available) {
 	
 	list<int> offsets = findDelimiters(str, DELIM);			// get list of delimiter positions in the current string
 	int str_len = str.len();								// get length of the string
@@ -121,7 +136,7 @@ void addToFile(string str, filereader &fp, list<file_index> &index, list<avail_l
 		add.off = fp.offset() - rlen;									// set values of struct
 		add.key = id;													// set values of struct
 		index.push_back(add);											// add struct to in memory index list
-		index.sort(index_cmp);											// keep index sorted
+		sort(index.begin(), index.end(), index_cmp);					// keep index sorted
 //		cout << "Added to index " << index.back().key << "\n";
 //		cout << "Index or Available was empty\n";
 	}
@@ -133,7 +148,7 @@ void addToFile(string str, filereader &fp, list<file_index> &index, list<avail_l
 		add.off = new_off;									// set values of struct
 		add.key = id;										// set values of struct
 		index.push_back(add);								// add struct to in memory availablity list
-		index.sort(index_cmp);								// sort index for fast lookups
+		sort(index.begin(), index.end(), index_cmp);		// sort index for fast lookups
 		cout << "Index or Available list were not empty\n";
 	}
 }
@@ -148,7 +163,7 @@ list<int> findDelimiters(string str, char DELIM)  {
 	return offsets;
 }
 
-int findOffset(list<avail_list> available, int rlen) {
+int findOffset(vector<avail_list> available, int rlen) {
 	// ****TO IMPLEMENT****
 	// Must find the "memory hole" that will accomodate rlen
 	// and add any remaining available space to the end of the list
@@ -190,8 +205,8 @@ void openFiles(string name, filereader &fp, filereader &index, filereader &avail
 	}
 }
 
-void readSupportStructures(filereader &index_file, list<file_index> &index_list, 
-	filereader &available_file, list<avail_list> &available_list)  {
+void readSupportStructures(filereader &index_file, vector<file_index> &index_list, 
+	filereader &available_file, vector<avail_list> &available_list)  {
 
 	file_index findex;							// structure to add to list
 	avail_list alist;							// structure to add to list
@@ -223,11 +238,11 @@ void readSupportStructures(filereader &index_file, list<file_index> &index_list,
 	available_file.close();
 
 	// DEBUG CODE -- prints values added to the lists
-	for (list<file_index>::const_iterator i = index_list.begin(); i != index_list.end(); i++)  {
+	for (vector<file_index>::const_iterator i = index_list.begin(); i != index_list.end(); i++)  {
 		cout << "Read Key: " << i->key << "\t\tRead Offset: " << i->off << "\n";
 	}
 
-	for (list<avail_list>::const_iterator i = available_list.begin(); i != available_list.end(); i++)  {
+	for (vector<avail_list>::const_iterator i = available_list.begin(); i != available_list.end(); i++)  {
 		cout << "Read Offset: " << i->off << "\t\tRead Size: " << i->size << "\n";
 	}
 	// END DEBUG
