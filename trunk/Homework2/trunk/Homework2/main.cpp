@@ -23,9 +23,6 @@ struct file_index {
 	int key;				// record key
 	long off;				// offset into main file
 	
-	bool index_cmp(const file_index& a, const file_index& b)  {
-	    return a.key < b.key;
-	}
 };
 
 struct avail_list {
@@ -41,6 +38,7 @@ list<int> findDelimiters(string str, char DELIM);
 int findOffset(list<avail_list> available, int rlen);
 bool file_test(const char *filename);
 int fileSize(const char* name);
+bool index_cmp(const file_index& a, const file_index& b);
 
 int main(int argc, char *argv[])  {
 
@@ -51,7 +49,6 @@ int main(int argc, char *argv[])  {
 	list<file_index> index_list;		// index list for fast PK location
 	list<avail_list> available_list;	// availability list of location of free space in db
 	char buffer[ 1024 ] = {};			// Initialize empty buffer
-	int count;							// Holds number of records to read
 	long offset = 0;					// offset into file we are reading
 	string cmd = "";					// string for command
 	std::string contents = "";			// std string so we can use "getline" from cin
@@ -124,6 +121,7 @@ void addToFile(string str, filereader &fp, list<file_index> &index, list<avail_l
 		add.off = fp.offset() - rlen;									// set values of struct
 		add.key = id;													// set values of struct
 		index.push_back(add);											// add struct to in memory index list
+		index.sort(index_cmp);											// keep index sorted
 //		cout << "Added to index " << index.back().key << "\n";
 //		cout << "Index or Available was empty\n";
 	}
@@ -245,4 +243,8 @@ int fileSize(const char* name) {
   ifstream::pos_type begin_pos = file.tellg();					// record position
   file.seekg(0, std::ios_base::end);							// seek to end
   return static_cast<int>(file.tellg() - begin_pos);			// return difference of positions
+}
+
+bool index_cmp(const file_index& a, const file_index& b)  {
+	    return a.key < b.key;
 }
