@@ -41,8 +41,9 @@ int findOffset(vector<avail_list> available, int rlen);
 bool file_test(const char *filename);
 int fileSize(const char* name);
 bool index_cmp(const file_index& a, const file_index& b);
-long find(const vector<file_index> &index, const string &target);
-void printRecord(const long &offset, filereader &fp, string str);
+int find(const vector<file_index> &index, const string &target);
+void printRecord(const int &v_index, filereader &fp, vector<file_index> index, string str);
+void deleteRecord(const int &v_index, filereader &fp, vector<file_index> &index, vector<avail_list> &available_list, string lookup);
 
 int main(int argc, char *argv[])  {
 
@@ -70,14 +71,12 @@ int main(int argc, char *argv[])  {
 			addToFile(token[1], fp, index_list, available_list);	// add record to db file
 		}
 		else if (token[0] == "find")  {
-			fp.close();												// close append stream
-			fp.open(name, 'r');										// open reading stream
-			printRecord(find(index_list, token[1]), fp, token[1]);	// find the requested record
-			fp.close();												// close reader
-			fp.open(name, 'a');										// open append stream
+			fp.open(name, 'r');											// open reading stream
+			printRecord(find(index_list, token[1]), fp, index_list, token[1]);	// find the requested record
 		}
 		else if (token[0] == "del")  {
-			cout << "DEL -- You entered " << token[1] << "\n";		// delete the requested record
+			fp.open(name, 'r');
+			deleteRecord(find(index_list, token[1]), fp, index_list, available_list, token[1]);
 		}
 		else if (token[0] == "end")  {								// quit the program
 //			cout << "Terminating program\n\n";
@@ -114,21 +113,42 @@ int main(int argc, char *argv[])  {
 	return 0;
 }
 
-void printRecord(const long &offset, filereader &fp, string lookup)  {
+void deleteRecord(const int &v_index, filereader &fp, vector<file_index> &index, vector<avail_list> &available_list, string lookup)  {
 
-	if (offset < 0) 
+	avail_list rec;					// struct to hold available memory space info
+
+	if (v_index < 0) 
 			cout << "No record with SID=" << lookup << " exists.\n";
 	else  {
-		long rec_len = 0;							// length of record to read
+		int offset = index[v_index].off;			// retreive offset of record
+		int rec_len = 0;							// length of record to read
+		fp.seek(offset, BEGIN);						// set pointer to correct file position
+		fp.read_raw((char*) &rec_len, sizeof(int));		// read record size
+		rec_len += sizeof(int);					// add info for record size storage
+		rec.off = offset;
+		rec.size = rec_len;
+		available_list.push_back(rec);
+		cout << "Erasing " << index[v_index].key << "\n";
+		index.erase(index.begin() + v_index);
+	}
+}
+
+void printRecord(const int &v_index, filereader &fp, vector<file_index> index, string lookup)  {
+
+	if (v_index < 0) 
+			cout << "No record with SID=" << lookup << " exists.\n";
+	else  {
+		int rec_len = 0;							// length of record to read
+		long offset = (long) index[v_index].off;	// retreive offset of record
 		char str[512] = {};							// char buffer for text
 		fp.seek(offset, BEGIN);						// set pointer to correct file position
-		fp.read_raw((char*) &rec_len, sizeof(long));		// read record size
+		fp.read_raw((char*) &rec_len, sizeof(int));		// read record size
 		fp.read_raw(str, rec_len);				// read stored string from file
 		cout << str << "\n";							// print record to screen
 	}
 }
 
-long find(const vector<file_index> &index, const string &target)  {
+int find(const vector<file_index> &index, const string &target)  {
 
 	// Standard Binary Search Implementation
 	int left = 0;
@@ -137,7 +157,7 @@ long find(const vector<file_index> &index, const string &target)  {
 	int t_int = atoi(target);
 	while ( left <= right )  {
 		if (t_int == index[mid].key)  {
-			return index[mid].off;
+			return mid;
 		}
 		else if (t_int > index[mid].key)  {
 			left = mid + 1;
