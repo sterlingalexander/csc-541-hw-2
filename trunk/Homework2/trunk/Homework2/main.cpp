@@ -41,7 +41,8 @@ int findOffset(vector<avail_list> available, int rlen);
 bool file_test(const char *filename);
 int fileSize(const char* name);
 bool index_cmp(const file_index& a, const file_index& b);
-avail_list find(const vector<file_index> &index, const string &target);
+long find(const vector<file_index> &index, const string &target);
+void printRecord(const long &offset, filereader &fp);
 
 int main(int argc, char *argv[])  {
 
@@ -69,8 +70,11 @@ int main(int argc, char *argv[])  {
 			addToFile(token[1], fp, index_list, available_list);	// add record to db file
 		}
 		else if (token[0] == "find")  {
-			find(index_list, token[1]);
-			cout << "FIND -- You entered " << token[1] << "\n";		// find the requested record
+			fp.close();												// close append stream
+			fp.open(name, 'r');										// open reading stream
+			printRecord(find(index_list, token[1]), fp);			// find the requested record
+			fp.close();												// close reader
+			fp.open(name, 'a');										// open append stream
 		}
 		else if (token[0] == "del")  {
 			cout << "DEL -- You entered " << token[1] << "\n";		// delete the requested record
@@ -88,7 +92,7 @@ int main(int argc, char *argv[])  {
 	index_file.seek(0, BEGIN);
 	available_file.seek(0, BEGIN);
 	// Now we need to write the contents of the index file.  We can use the same loop construct to 
-	//		write the availability list to the file.  Since we are writing them in binary, when we 
+	//		write the availability vector to the file.  Since we are writing them in binary, when we 
 	//		read in the index we can just read the key, offset pairs without using any delimiters.
 	for (vector<file_index>::const_iterator i = index_list.begin(); i != index_list.end(); i++)  {
 		index_file.write_raw( (char*) &i->key, sizeof(int));
@@ -107,15 +111,37 @@ int main(int argc, char *argv[])  {
 	return 0;
 }
 
-avail_list find(const vector<file_index> &index, const string &target)  {
+void printRecord(const long &offset, filereader &fp)  {
+
+	long rec_len = 0;
+	char str[512] = {};
+	fp.seek(offset, BEGIN);
+	fp.read_raw((char*) &rec_len, sizeof(long));		// read record size
+	fp.read_raw(str, rec_len);				// read stored string from file
+	cout << "\t" << str << "\n";							// print record to screen
+}
+
+long find(const vector<file_index> &index, const string &target)  {
 
 	int left = 0;
-	int right = index.size();
+	int right = index.size() - 1;
 	int mid = right / 2;
-	avail_list record;
+	int t_int = atoi(target);
 	while ( left <= right )  {
+		if (t_int == index[mid].key)  {
+			return index[mid].off;
+		}
+		else if (t_int > index[mid].key)  {
+			left = mid + 1;
+			mid = left + ((right - left) / 2);
+		}
+		else if (t_int < index[mid].key)  {
+			right = mid - 1;
+			mid = left + ((right - left) / 2);
+		}
 	}
-	return record;
+	cout << "No record with SID=" << t_int << " exists.\n";
+	return -1;
 }
 
 void addToFile(string str, filereader &fp, vector<file_index> &index, vector<avail_list> &available) {
@@ -127,29 +153,29 @@ void addToFile(string str, filereader &fp, vector<file_index> &index, vector<ava
 		id = str;											// it must be a record ID
 	else													// otherwise
 		id = str.substr(0, offsets.front() - 1);			// get ID field from passed in string
-	file_index add;											// create file_index to add to list
+	file_index add;											// create file_index to add to vector
 	int rlen = sizeof (int) + str_len;						// get total size of record to add to file
-	if ( index.empty() || available.empty() )  {			// if both lists are empty
+	if ( index.empty() || available.empty() )  {			// if both vectors are empty
 //		cout << "offset at add position is " << fp.offset() << "\n";	// the file is either empty of there are no holes
 		fp.write_raw( (char*) &str_len, sizeof (int));					// we will add to the end of the file because we are in append mode
 		fp.write_raw(str, str_len);										// do raw writes
 		add.off = fp.offset() - rlen;									// set values of struct
 		add.key = id;													// set values of struct
-		index.push_back(add);											// add struct to in memory index list
+		index.push_back(add);											// add struct to in memory index vector
 		sort(index.begin(), index.end(), index_cmp);					// keep index sorted
 //		cout << "Added to index " << index.back().key << "\n";
 //		cout << "Index or Available was empty\n";
 	}
-	else {													// index and avail list info exists
+	else {													// index and avail vector info exists
 		int new_off = findOffset(available, rlen);			// calculate offset ****TO IMPLEMENT*****
 		fp.seek(new_off, BEGIN);							// seek to offset to write to
 		fp.write_raw( (char*) &str_len, sizeof (int) );		// perform raw writes
 		fp.write_raw(str, str_len);							// perform raw writes
 		add.off = new_off;									// set values of struct
 		add.key = id;										// set values of struct
-		index.push_back(add);								// add struct to in memory availablity list
+		index.push_back(add);								// add struct to in memory availablity vector
 		sort(index.begin(), index.end(), index_cmp);		// sort index for fast lookups
-		cout << "Index or Available list were not empty\n";
+		cout << "Index or Available vector were not empty\n";
 	}
 }
 
@@ -166,7 +192,7 @@ list<int> findDelimiters(string str, char DELIM)  {
 int findOffset(vector<avail_list> available, int rlen) {
 	// ****TO IMPLEMENT****
 	// Must find the "memory hole" that will accomodate rlen
-	// and add any remaining available space to the end of the list
+	// and add any remaining available space to the end of the vector
 	return 1;
 }
 
@@ -179,39 +205,39 @@ void openFiles(string name, filereader &fp, filereader &index, filereader &avail
 
 	if (file_test(name))  {			// Method for opening files or creating them.
 		fp.open(name, 'a');
-		cout << name << " was opened for writing\n";
+//		cout << name << " was opened for writing\n";
 	}
 	else  {
 		fp.open(name, 'w');
-		cout << name << " was CREATED for writing\n";
+//		cout << name << " was CREATED for writing\n";
 	}
 	
 	if (file_test(INDEX_FILE))  {
 		index.open(INDEX_FILE, 'r');
-		cout << "Index.db was opened.\n";
+//		cout << "Index.db was opened.\n";
 	}
 	else  {
 		index.open(INDEX_FILE, 'w');
-		cout << "Index.db was CREATED.\n";
+//		cout << "Index.db was CREATED.\n";
 	}
 
 	if (file_test(AVAIL_FILE))  {
 		available.open(AVAIL_FILE, 'r');
-		cout << "Avail.db was opened.\n";
+//		cout << "Avail.db was opened.\n";
 	}
 	else  {
 		available.open(AVAIL_FILE, 'w');
-		cout << "Avail.db was CREATED.\n";
+//		cout << "Avail.db was CREATED.\n";
 	}
 }
 
 void readSupportStructures(filereader &index_file, vector<file_index> &index_list, 
 	filereader &available_file, vector<avail_list> &available_list)  {
 
-	file_index findex;							// structure to add to list
-	avail_list alist;							// structure to add to list
+	file_index findex;							// structure to add to vector
+	avail_list alist;							// structure to add to vector
 	int index_end = fileSize(INDEX_FILE);		// file size of index file
-	int avail_end = fileSize(AVAIL_FILE);		// file size of availability list file
+	int avail_end = fileSize(AVAIL_FILE);		// file size of availability vector file
 	int growth = sizeof(int) + sizeof(long);	// offset growth of two data elements.
 	int key = 0;								// key value to read
 	int off = 0;								// offset value to read
@@ -221,23 +247,23 @@ void readSupportStructures(filereader &index_file, vector<file_index> &index_lis
 		index_file.read_raw((char*) &key, sizeof(int));		// read key value
 		index_file.read_raw((char*) &off, sizeof(long));	// read offset value
 //		cout << "Adding Key: " << key << "\t\tOffset: " << off << "\n";
-		findex.key = key;									// set struct value for in memory list
-		findex.off = off;									// set struct value for in memory list
-		index_list.push_back(findex);						// add struct to list
+		findex.key = key;									// set struct value for in memory vector
+		findex.off = off;									// set struct value for in memory vector
+		index_list.push_back(findex);						// add struct to vector
 	}
 
 	for (int i = 0; i < avail_end; i += growth)  {
 		available_file.read_raw((char*) &off, sizeof(int));		// read offset value
 		available_file.read_raw((char*) &size, sizeof(long));	// read size value
-		alist.off = off;										// set struct value for in memory list
-		alist.size = size;										// set struct value for in memory list
-		available_list.push_back(alist);						// add struct to list
-//		cout << "Added record " << i << " to availability list\n";
+		alist.off = off;										// set struct value for in memory vector
+		alist.size = size;										// set struct value for in memory vector
+		available_list.push_back(alist);						// add struct to vector
+//		cout << "Added record " << i << " to availability vector\n";
 	}
 	index_file.close();
 	available_file.close();
-
-	// DEBUG CODE -- prints values added to the lists
+/*
+	// DEBUG CODE -- prints values added to the vectors
 	for (vector<file_index>::const_iterator i = index_list.begin(); i != index_list.end(); i++)  {
 		cout << "Read Key: " << i->key << "\t\tRead Offset: " << i->off << "\n";
 	}
@@ -246,6 +272,7 @@ void readSupportStructures(filereader &index_file, vector<file_index> &index_lis
 		cout << "Read Offset: " << i->off << "\t\tRead Size: " << i->size << "\n";
 	}
 	// END DEBUG
+*/
 }
 
 int fileSize(const char* name) {
