@@ -128,7 +128,6 @@ void deleteRecord(const int &v_index, filereader &fp, vector<file_index> &index,
 		rec.off = offset;
 		rec.size = rec_len;
 		available_list.push_back(rec);
-		cout << "Erasing " << index[v_index].key << "\n";
 		index.erase(index.begin() + v_index);
 	}
 }
@@ -181,7 +180,7 @@ void addToFile(string str, filereader &fp, vector<file_index> &index, vector<ava
 	else													// otherwise
 		id = str.substr(0, offsets.front() - 1);			// get ID field from passed in string
 	if (find(index, id) != -1)  {
-		cout << "\tDuplicate Record --> Update can be implemented after delete\n\n";
+//		cout << "\tDuplicate Record --> Update can be implemented after delete\n\n";
 		return;
 	}
 	file_index add;											// create file_index to add to vector
@@ -206,7 +205,7 @@ void addToFile(string str, filereader &fp, vector<file_index> &index, vector<ava
 		add.key = id;										// set values of struct
 		index.push_back(add);								// add struct to in memory availablity vector
 		sort(index.begin(), index.end(), index_cmp);		// sort index for fast lookups
-		cout << "Index or Available vector were not empty\n";	// DEBUG
+//		cout << "Index or Available vector were not empty\n";	// DEBUG
 	}
 }
 
