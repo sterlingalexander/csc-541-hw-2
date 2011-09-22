@@ -87,24 +87,24 @@ int main(int argc, char *argv[])  {
 			cout << "Please enter a valid command.\n\n";
 	}
 	
-	index_file.open(INDEX_FILE, 'w');
-	available_file.open(AVAIL_FILE, 'w');
-	index_file.seek(0, BEGIN);
-	available_file.seek(0, BEGIN);
+	index_file.open(INDEX_FILE, 'w');			// be sure the file is in the correct state
+	available_file.open(AVAIL_FILE, 'w');		// this one too
+	index_file.seek(0, BEGIN);					// put pointers at the beginning of file
+	available_file.seek(0, BEGIN);				// this one too
 	// Now we need to write the contents of the index file.  We can use the same loop construct to 
 	//		write the availability vector to the file.  Since we are writing them in binary, when we 
 	//		read in the index we can just read the key, offset pairs without using any delimiters.
 	cout << "Index:\n";
 	for (vector<file_index>::const_iterator i = index_list.begin(); i != index_list.end(); i++)  {
-		index_file.write_raw( (char*) &i->key, sizeof(int));
-		index_file.write_raw( (char*) &i->off, sizeof(long));
-		printf( "%d: %ld\n", i->key, i->off );
+		index_file.write_raw( (char*) &i->key, sizeof(int));		// write key to file
+		index_file.write_raw( (char*) &i->off, sizeof(long));		// write offset to file
+		printf( "%d: %ld\n", i->key, i->off );						// write output to screen
 	}
 	cout << "Availability:\n";
 	for (vector<avail_list>::const_iterator i = available_list.begin(); i != available_list.end(); i++)  {
-		available_file.write_raw( (char*) &i->off, sizeof(long));
-		available_file.write_raw( (char*) &i->size, sizeof(int));
-		printf( "%d: %ld\n", i->off, i->size);
+		available_file.write_raw( (char*) &i->off, sizeof(long));	// write offset to file
+		available_file.write_raw( (char*) &i->size, sizeof(int));	// write size of hole to file
+		printf( "%d: %ld\n", i->off, i->size);						// write output to screen
 	}
 
 	// Close all file pointers
@@ -119,9 +119,9 @@ void printRecord(const long &offset, filereader &fp, string lookup)  {
 	if (offset < 0) 
 			cout << "No record with SID=" << lookup << " exists.\n";
 	else  {
-		long rec_len = 0;
-		char str[512] = {};
-		fp.seek(offset, BEGIN);
+		long rec_len = 0;							// length of record to read
+		char str[512] = {};							// char buffer for text
+		fp.seek(offset, BEGIN);						// set pointer to correct file position
 		fp.read_raw((char*) &rec_len, sizeof(long));		// read record size
 		fp.read_raw(str, rec_len);				// read stored string from file
 		cout << str << "\n";							// print record to screen
@@ -130,6 +130,7 @@ void printRecord(const long &offset, filereader &fp, string lookup)  {
 
 long find(const vector<file_index> &index, const string &target)  {
 
+	// Standard Binary Search Implementation
 	int left = 0;
 	int right = index.size() - 1;
 	int mid = right / 2;
@@ -147,7 +148,7 @@ long find(const vector<file_index> &index, const string &target)  {
 			mid = left + ((right - left) / 2);
 		}
 	}
-	return -1;
+	return -1;		// return impossible value if key doesn't exist
 }
 
 void addToFile(string str, filereader &fp, vector<file_index> &index, vector<avail_list> &available) {
@@ -176,7 +177,7 @@ void addToFile(string str, filereader &fp, vector<file_index> &index, vector<ava
 //		cout << "Added to index " << index.back().key << "\n";
 //		cout << "Index or Available was empty\n";
 	}
-	else {													// index and avail vector info exists
+	else {						//NEEDS IMPLEMENTED AFTER DELETE	// if index and avail vector info exists
 		int new_off = findOffset(available, rlen);			// calculate offset ****TO IMPLEMENT*****
 		fp.seek(new_off, BEGIN);							// seek to offset to write to
 		fp.write_raw( (char*) &str_len, sizeof (int) );		// perform raw writes
@@ -185,18 +186,18 @@ void addToFile(string str, filereader &fp, vector<file_index> &index, vector<ava
 		add.key = id;										// set values of struct
 		index.push_back(add);								// add struct to in memory availablity vector
 		sort(index.begin(), index.end(), index_cmp);		// sort index for fast lookups
-		cout << "Index or Available vector were not empty\n";
+		cout << "Index or Available vector were not empty\n";	// DEBUG
 	}
 }
 
 list<int> findDelimiters(string str, char DELIM)  {
 
-	list<int> offsets;
-	for (int i = 0; i < str.len(); i++)  {
-		if (str[i] == DELIM)
-			offsets.push_back(i);
+	list<int> offsets;						// list of delimiter offsets
+	for (int i = 0; i < str.len(); i++)  {	// iterate string
+		if (str[i] == DELIM)				// find delimiters
+			offsets.push_back(i);			// add them to list
 	}
-	return offsets;
+	return offsets;							// return list
 }
 
 int findOffset(vector<avail_list> available, int rlen) {
@@ -297,5 +298,8 @@ int fileSize(const char* name) {
 }
 
 bool index_cmp(const file_index& a, const file_index& b)  {
-	    return a.key < b.key;
+	// This method defines the "<" operator for our index struct and allows for "sort" 
+	//		to be called on vectors.  If we wanted to sort the avail list, we would need to do the same
+	//		but I don't think we are supposed to sort avail.
+	return a.key < b.key;		
 }
