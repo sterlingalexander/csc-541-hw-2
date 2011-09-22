@@ -133,10 +133,9 @@ void addToFile(string str, filereader &fp, list<file_index> &index, list<avail_l
 		add.off = new_off;									// set values of struct
 		add.key = id;										// set values of struct
 		index.push_back(add);								// add struct to in memory availablity list
-		//index.sort();										// sort index for fast lookups
+		index.sort(index_cmp);								// sort index for fast lookups
 		cout << "Index or Available list were not empty\n";
 	}
-//	cout << "Leaving addToFile...\n\n";
 }
 
 list<int> findDelimiters(string str, char DELIM)  {
