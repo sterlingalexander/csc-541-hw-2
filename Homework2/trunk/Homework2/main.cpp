@@ -42,7 +42,7 @@ bool file_test(const char *filename);
 int fileSize(const char* name);
 bool index_cmp(const file_index& a, const file_index& b);
 long find(const vector<file_index> &index, const string &target);
-void printRecord(const long &offset, filereader &fp);
+void printRecord(const long &offset, filereader &fp, string str);
 
 int main(int argc, char *argv[])  {
 
@@ -61,7 +61,7 @@ int main(int argc, char *argv[])  {
 	readSupportStructures(index_file, index_list, available_file, available_list);
 
 	while (1)  {							// till we need to quit...
-		cout << "Please input command:  ";
+//		cout << "Please input command:  ";
 		getline(cin, contents, '\n');		// get line contents
 		string c2 = contents.c_str();		// make a non-std string to tokenize
 		string token[5] = {};				// array of strings to hold tokens
@@ -72,7 +72,7 @@ int main(int argc, char *argv[])  {
 		else if (token[0] == "find")  {
 			fp.close();												// close append stream
 			fp.open(name, 'r');										// open reading stream
-			printRecord(find(index_list, token[1]), fp);			// find the requested record
+			printRecord(find(index_list, token[1]), fp, token[1]);	// find the requested record
 			fp.close();												// close reader
 			fp.open(name, 'a');										// open append stream
 		}
@@ -80,8 +80,8 @@ int main(int argc, char *argv[])  {
 			cout << "DEL -- You entered " << token[1] << "\n";		// delete the requested record
 		}
 		else if (token[0] == "end")  {								// quit the program
-			cout << "Terminating program\n\n";
-				break;
+//			cout << "Terminating program\n\n";
+			break;
 		}
 		else
 			cout << "Please enter a valid command.\n\n";
@@ -94,14 +94,17 @@ int main(int argc, char *argv[])  {
 	// Now we need to write the contents of the index file.  We can use the same loop construct to 
 	//		write the availability vector to the file.  Since we are writing them in binary, when we 
 	//		read in the index we can just read the key, offset pairs without using any delimiters.
+	cout << "Index:\n";
 	for (vector<file_index>::const_iterator i = index_list.begin(); i != index_list.end(); i++)  {
 		index_file.write_raw( (char*) &i->key, sizeof(int));
 		index_file.write_raw( (char*) &i->off, sizeof(long));
+		printf( "%d: %ld\n", i->key, i->off );
 	}
-
+	cout << "Availability:\n";
 	for (vector<avail_list>::const_iterator i = available_list.begin(); i != available_list.end(); i++)  {
 		available_file.write_raw( (char*) &i->off, sizeof(long));
 		available_file.write_raw( (char*) &i->size, sizeof(int));
+		printf( "%d: %ld\n", i->off, i->size);
 	}
 
 	// Close all file pointers
@@ -111,14 +114,18 @@ int main(int argc, char *argv[])  {
 	return 0;
 }
 
-void printRecord(const long &offset, filereader &fp)  {
+void printRecord(const long &offset, filereader &fp, string lookup)  {
 
-	long rec_len = 0;
-	char str[512] = {};
-	fp.seek(offset, BEGIN);
-	fp.read_raw((char*) &rec_len, sizeof(long));		// read record size
-	fp.read_raw(str, rec_len);				// read stored string from file
-	cout << "\t" << str << "\n";							// print record to screen
+	if (offset < 0) 
+			cout << "No record with SID=" << lookup << " exists.\n";
+	else  {
+		long rec_len = 0;
+		char str[512] = {};
+		fp.seek(offset, BEGIN);
+		fp.read_raw((char*) &rec_len, sizeof(long));		// read record size
+		fp.read_raw(str, rec_len);				// read stored string from file
+		cout << str << "\n";							// print record to screen
+	}
 }
 
 long find(const vector<file_index> &index, const string &target)  {
@@ -140,7 +147,6 @@ long find(const vector<file_index> &index, const string &target)  {
 			mid = left + ((right - left) / 2);
 		}
 	}
-	cout << "No record with SID=" << t_int << " exists.\n";
 	return -1;
 }
 
@@ -153,6 +159,10 @@ void addToFile(string str, filereader &fp, vector<file_index> &index, vector<ava
 		id = str;											// it must be a record ID
 	else													// otherwise
 		id = str.substr(0, offsets.front() - 1);			// get ID field from passed in string
+	if (find(index, id) != -1)  {
+		cout << "\tDuplicate Record --> Update can be implemented after delete\n\n";
+		return;
+	}
 	file_index add;											// create file_index to add to vector
 	int rlen = sizeof (int) + str_len;						// get total size of record to add to file
 	if ( index.empty() || available.empty() )  {			// if both vectors are empty
