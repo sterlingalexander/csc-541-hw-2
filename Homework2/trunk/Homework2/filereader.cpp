@@ -245,7 +245,8 @@ long filereader::offset()
    //  This method returns the current pointer position within the file
 {
    if ( mode != READ && mode != READ_WRITE ) {
-      return 0L;
+      //return 0L;
+	  return out_fp->tellp();
    }
 
    return inp_fp->tellg();
