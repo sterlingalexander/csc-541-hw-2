@@ -44,6 +44,7 @@ list<int> findDelimiters(string str, char DELIM);
 int findOffset(vector<avail_list> &available, int rlen);
 bool fileTest(const char *filename);
 int fileSize(const char* name);
+int fileSize(fstream &fp);
 bool indexCmp(const file_index& a, const file_index& b);
 int find(const vector<file_index> &index, const string &target);
 void printRecord(const int &v_index, fstream &fp, vector<file_index> index, string str);
@@ -192,22 +193,33 @@ void addToFile(string str, fstream &fp, vector<file_index> &index, vector<avail_
 //		cout << "offset at add position is " << fp.offset() << "\n";	// the file is either empty of there are no holes
 		fp.write( (char*) &str_len, sizeof (int));					// we will add to the end of the file because we are in append mode
 		fp.write(str, str_len);										// do raw writes
-		add.off = (int) fp.tellp() - rlen;								// set values of struct
-		add.key = id;													// set values of struct
-		index.push_back(add);											// add struct to in memory index vector
+		add.off = (int) fp.tellp() - rlen;							// set values of struct
+		add.key = id;												// set values of struct
+		index.push_back(add);										// add struct to in memory index vector
 		sort(index.begin(), index.end(), indexCmp);					// keep index sorted
 //		cout << "Added to index " << index.back().key << "\n";
 //		cout << "Index or Available was empty\n";
 	}
-	else {													// if index and avail vector info exists
-		int new_off = findOffset(available, rlen);			// calculate offset
-		fp.seekp(new_off, ios::beg);							// seek to offset to write to
+	else {												// if index and avail vector info exists
+		int new_off = findOffset(available, rlen);		// calculate offset
+		if (new_off > 0)  {
+		fp.seekp(new_off, ios::beg);					// seek to offset to write to
 		fp.write( (char*) &str_len, sizeof (int) );		// perform raw writes
 		fp.write(str, str_len);							// perform raw writes
-		add.off = new_off;									// set values of struct
-		add.key = id;										// set values of struct
-		index.push_back(add);								// add struct to in memory availablity vector
+		add.off = new_off;								// set values of struct
+		add.key = id;									// set values of struct
+		index.push_back(add);							// add struct to in memory availablity vector
 		sort(index.begin(), index.end(), indexCmp);		// sort index for fast lookups
+		}
+		else  {
+			add.off = fileSize(fp);							// set values of struct
+			add.key = id;									// set values of struct
+			fp.seekp(0, ios::end);							// seek to offset to write to
+			fp.write( (char*) &str_len, sizeof (int) );		// perform raw writes
+			fp.write(str, str_len);							// perform raw writes
+			index.push_back(add);							// add struct to in memory availablity vector
+			sort(index.begin(), index.end(), indexCmp);		// sort index for fast lookups
+		}
 //		cout << "Index or Available vector were not empty\n";	// DEBUG
 	}
 }
@@ -324,6 +336,13 @@ void readSupportStructures(fstream &index_file, vector<file_index> &index_list,
 	}
 	// END DEBUG
 */
+}
+
+int fileSize(fstream &fp)  {
+	fp.seekg(0, ios::beg);								// otherwise go to beginning
+	ifstream::pos_type begin_pos = fp.tellg();			// record position
+	fp.seekg(0, ios::end);								// seek to end
+	return static_cast<int>(fp.tellg() - begin_pos);	// return difference of positions
 }
 
 int fileSize(const char* name) {
