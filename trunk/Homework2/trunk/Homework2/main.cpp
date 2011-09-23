@@ -22,8 +22,8 @@ using std::ios;
 using std::ios_base;
 
 const char DELIM = '|';					// Global constant delimiter in written file
-const std::string INDEX_FILE = "index.db";	// Global constant for index database
-const std::string AVAIL_FILE = "avail.db";	// Global constant for availability database
+std::string INDEX_FILE = "index";	// Global constant for index database
+std::string AVAIL_FILE = "avail";	// Global constant for availability database
 
 struct file_index {
 	int key;				// record key
@@ -51,6 +51,11 @@ void deleteRecord(const int &v_index, fstream &fp, vector<file_index> &index, ve
 
 int main(int argc, char *argv[])  {
 
+	if (argc == 1)  {
+		cout << "Please enter a database name to open";
+		exit(0);
+	}
+
 	fstream fp;						// reader for database file
 	fstream index_file;				// reader for index file
 	fstream available_file;			// reader for availability list
@@ -61,6 +66,9 @@ int main(int argc, char *argv[])  {
 	long offset = 0;					// offset into file we are reading
 	string cmd = "";					// string for command
 	std::string contents = "";			// std string so we can use "getline" from cin
+	std::string n_str = name;
+	INDEX_FILE += "_" + n_str + ".db";
+	AVAIL_FILE += "_" + n_str + ".db";
 
 	openFiles(name, fp, index_file, available_file);		// open all files
 	readSupportStructures(index_file, index_list, available_file, available_list); // read any persistent structures
