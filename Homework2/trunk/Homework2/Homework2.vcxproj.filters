@@ -18,18 +18,12 @@
     <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="filereader.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="str.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="str.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="filereader.h">
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="resource.h">
