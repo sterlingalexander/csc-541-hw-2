@@ -3,11 +3,12 @@
 #include <iostream>
 #include <fstream>
 #include <string>
-#include "filereader.h"
+#include <fstream>
 #include "str.h"
 #include <list>
 #include <algorithm>
 #include <vector>
+#include <iomanip>
 
 using std::cin;
 using std::cout;
@@ -16,10 +17,13 @@ using std::list;
 using std::vector;
 using std::sort;
 using std::ifstream;
+using std::fstream;
+using std::ios;
+using std::ios_base;
 
 const char DELIM = '|';					// Global constant delimiter in written file
-const string INDEX_FILE = "index.db";	// Global constant for index database
-const string AVAIL_FILE = "avail.db";	// Global constant for availability database
+const std::string INDEX_FILE = "index.db";	// Global constant for index database
+const std::string AVAIL_FILE = "avail.db";	// Global constant for availability database
 
 struct file_index {
 	int key;				// record key
@@ -32,24 +36,24 @@ struct avail_list {
 	long off;			// offset into main file
 };
 
-void openFiles(string name, filereader &fp, filereader &index, filereader &available);
-void addToFile(string str, filereader &fp, vector<file_index> &index, vector<avail_list> &available);
-void readSupportStructures(filereader &index_file, vector<file_index> &index_list,
-			filereader &available_file, vector<avail_list> &available_list);
+void openFiles(string name, fstream &fp, fstream &index, fstream &available);
+void addToFile(string str, fstream &fp, vector<file_index> &index, vector<avail_list> &available);
+void readSupportStructures(fstream &index_file, vector<file_index> &index_list,
+			fstream &available_file, vector<avail_list> &available_list);
 list<int> findDelimiters(string str, char DELIM);
-int findOffset(vector<avail_list> available, int rlen);
-bool file_test(const char *filename);
+int findOffset(vector<avail_list> &available, int rlen);
+bool fileTest(const char *filename);
 int fileSize(const char* name);
-bool index_cmp(const file_index& a, const file_index& b);
+bool indexCmp(const file_index& a, const file_index& b);
 int find(const vector<file_index> &index, const string &target);
-void printRecord(const int &v_index, filereader &fp, vector<file_index> index, string str);
-void deleteRecord(const int &v_index, filereader &fp, vector<file_index> &index, vector<avail_list> &available_list, string lookup);
+void printRecord(const int &v_index, fstream &fp, vector<file_index> index, string str);
+void deleteRecord(const int &v_index, fstream &fp, vector<file_index> &index, vector<avail_list> &available_list, string lookup);
 
 int main(int argc, char *argv[])  {
 
-	filereader fp;						// reader for database file
-	filereader index_file;				// reader for index file
-	filereader available_file;			// reader for availability list
+	fstream fp;						// reader for database file
+	fstream index_file;				// reader for index file
+	fstream available_file;			// reader for availability list
 	string name = argv[1];				// passed in file name
 	vector<file_index> index_list;		// index list for fast PK location
 	vector<avail_list> available_list;	// availability list of location of free space in db
@@ -71,11 +75,9 @@ int main(int argc, char *argv[])  {
 			addToFile(token[1], fp, index_list, available_list);	// add record to db file
 		}
 		else if (token[0] == "find")  {
-			fp.open(name, 'r');											// open reading stream
 			printRecord(find(index_list, token[1]), fp, index_list, token[1]);	// find the requested record
 		}
 		else if (token[0] == "del")  {
-			fp.open(name, 'r');
 			deleteRecord(find(index_list, token[1]), fp, index_list, available_list, token[1]);
 		}
 		else if (token[0] == "end")  {								// quit the program
@@ -86,34 +88,35 @@ int main(int argc, char *argv[])  {
 			cout << "Please enter a valid command.\n\n";
 	}
 	
-	index_file.open(INDEX_FILE, 'w');			// be sure the file is in the correct state
-	available_file.open(AVAIL_FILE, 'w');		// this one too
-	index_file.seek(0, BEGIN);					// put pointers at the beginning of file
-	available_file.seek(0, BEGIN);				// this one too
+	index_file.seekp(0, ios::beg);					// put pointers at the beginning of file
+	available_file.seekp(0, ios::beg);				// this one too
 	// Now we need to write the contents of the index file.  We can use the same loop construct to 
 	//		write the availability vector to the file.  Since we are writing them in binary, when we 
 	//		read in the index we can just read the key, offset pairs without using any delimiters.
 	cout << "Index:\n";
 	for (vector<file_index>::const_iterator i = index_list.begin(); i != index_list.end(); i++)  {
-		index_file.write_raw( (char*) &i->key, sizeof(int));		// write key to file
-		index_file.write_raw( (char*) &i->off, sizeof(long));		// write offset to file
+		index_file.write( (char*) &i->key, sizeof(int));		// write key to file
+		index_file.write( (char*) &i->off, sizeof(long));		// write offset to file
 		printf( "%d: %ld\n", i->key, i->off );						// write output to screen
 	}
 	cout << "Availability:\n";
 	for (vector<avail_list>::const_iterator i = available_list.begin(); i != available_list.end(); i++)  {
-		available_file.write_raw( (char*) &i->off, sizeof(long));	// write offset to file
-		available_file.write_raw( (char*) &i->size, sizeof(int));	// write size of hole to file
+		available_file.write( (char*) &i->off, sizeof(long));	// write offset to file
+		available_file.write( (char*) &i->size, sizeof(int));	// write size of hole to file
 		printf( "%d: %ld\n", i->off, i->size);						// write output to screen
 	}
 
-	// Close all file pointers
+	// Flush and close all file pointers
+	fp.flush();
 	fp.close();
+	index_file.flush();
 	index_file.close();
+	available_file.flush();
 	available_file.close();
 	return 0;
 }
 
-void deleteRecord(const int &v_index, filereader &fp, vector<file_index> &index, vector<avail_list> &available_list, string lookup)  {
+void deleteRecord(const int &v_index, fstream &fp, vector<file_index> &index, vector<avail_list> &available_list, string lookup)  {
 
 	avail_list rec;					// struct to hold available memory space info
 
@@ -122,8 +125,8 @@ void deleteRecord(const int &v_index, filereader &fp, vector<file_index> &index,
 	else  {
 		int offset = index[v_index].off;			// retreive offset of record
 		int rec_len = 0;							// length of record to read
-		fp.seek(offset, BEGIN);						// set pointer to correct file position
-		fp.read_raw((char*) &rec_len, sizeof(int));		// read record size
+		fp.seekg(offset, ios::beg);						// set pointer to correct file position
+		fp.read((char*) &rec_len, sizeof(int));		// read record size
 		rec_len += sizeof(int);					// add info for record size storage
 		rec.off = offset;
 		rec.size = rec_len;
@@ -132,7 +135,7 @@ void deleteRecord(const int &v_index, filereader &fp, vector<file_index> &index,
 	}
 }
 
-void printRecord(const int &v_index, filereader &fp, vector<file_index> index, string lookup)  {
+void printRecord(const int &v_index, fstream &fp, vector<file_index> index, string lookup)  {
 
 	if (v_index < 0) 
 			cout << "No record with SID=" << lookup << " exists.\n";
@@ -140,9 +143,9 @@ void printRecord(const int &v_index, filereader &fp, vector<file_index> index, s
 		int rec_len = 0;							// length of record to read
 		long offset = (long) index[v_index].off;	// retreive offset of record
 		char str[512] = {};							// char buffer for text
-		fp.seek(offset, BEGIN);						// set pointer to correct file position
-		fp.read_raw((char*) &rec_len, sizeof(int));		// read record size
-		fp.read_raw(str, rec_len);				// read stored string from file
+		fp.seekg(offset, ios::beg);						// set pointer to correct file position
+		fp.read((char*) &rec_len, sizeof(int));		// read record size
+		fp.read(str, rec_len);				// read stored string from file
 		cout << str << "\n";							// print record to screen
 	}
 }
@@ -170,7 +173,7 @@ int find(const vector<file_index> &index, const string &target)  {
 	return -1;		// return impossible value if key doesn't exist
 }
 
-void addToFile(string str, filereader &fp, vector<file_index> &index, vector<avail_list> &available) {
+void addToFile(string str, fstream &fp, vector<file_index> &index, vector<avail_list> &available) {
 	
 	list<int> offsets = findDelimiters(str, DELIM);			// get list of delimiter positions in the current string
 	int str_len = str.len();								// get length of the string
@@ -187,24 +190,24 @@ void addToFile(string str, filereader &fp, vector<file_index> &index, vector<ava
 	int rlen = sizeof (int) + str_len;						// get total size of record to add to file
 	if ( index.empty() || available.empty() )  {			// if both vectors are empty
 //		cout << "offset at add position is " << fp.offset() << "\n";	// the file is either empty of there are no holes
-		fp.write_raw( (char*) &str_len, sizeof (int));					// we will add to the end of the file because we are in append mode
-		fp.write_raw(str, str_len);										// do raw writes
-		add.off = fp.offset() - rlen;									// set values of struct
+		fp.write( (char*) &str_len, sizeof (int));					// we will add to the end of the file because we are in append mode
+		fp.write(str, str_len);										// do raw writes
+		add.off = (int) fp.tellp() - rlen;								// set values of struct
 		add.key = id;													// set values of struct
 		index.push_back(add);											// add struct to in memory index vector
-		sort(index.begin(), index.end(), index_cmp);					// keep index sorted
+		sort(index.begin(), index.end(), indexCmp);					// keep index sorted
 //		cout << "Added to index " << index.back().key << "\n";
 //		cout << "Index or Available was empty\n";
 	}
-	else {						//NEEDS IMPLEMENTED AFTER DELETE	// if index and avail vector info exists
-		int new_off = findOffset(available, rlen);			// calculate offset ****TO IMPLEMENT*****
-		fp.seek(new_off, BEGIN);							// seek to offset to write to
-		fp.write_raw( (char*) &str_len, sizeof (int) );		// perform raw writes
-		fp.write_raw(str, str_len);							// perform raw writes
+	else {													// if index and avail vector info exists
+		int new_off = findOffset(available, rlen);			// calculate offset
+		fp.seekp(new_off, ios::beg);							// seek to offset to write to
+		fp.write( (char*) &str_len, sizeof (int) );		// perform raw writes
+		fp.write(str, str_len);							// perform raw writes
 		add.off = new_off;									// set values of struct
 		add.key = id;										// set values of struct
 		index.push_back(add);								// add struct to in memory availablity vector
-		sort(index.begin(), index.end(), index_cmp);		// sort index for fast lookups
+		sort(index.begin(), index.end(), indexCmp);		// sort index for fast lookups
 //		cout << "Index or Available vector were not empty\n";	// DEBUG
 	}
 }
@@ -219,63 +222,83 @@ list<int> findDelimiters(string str, char DELIM)  {
 	return offsets;							// return list
 }
 
-int findOffset(vector<avail_list> available, int rlen) {
-	// ****TO IMPLEMENT****
-	// Must find the "memory hole" that will accomodate rlen
-	// and add any remaining available space to the end of the vector
-	return 1;
+int findOffset(vector<avail_list> &available, int rlen) {
+
+	for (int i = 0; i < available.size(); i++)  {
+		if (available[i].size == rlen)  {
+			int off = available[i].off;
+			available.erase(available.begin() + i);
+			return off;
+		}
+		else if (available[i].size > rlen)  {
+			int off = available[i].off;
+			int residual = available[i].size - rlen;
+			long residual_offset = off + rlen;
+			avail_list rec;
+			rec.off = residual_offset;
+			rec.size = residual;
+			available.erase(available.begin() + i);
+			available.push_back(rec);
+			return off;
+		}
+		else {}							// memory hold is smaller than record to add
+	}
+	return -1;							// failure returns impossible value
 }
 
-bool file_test(const char *filename)  {
+bool fileTest(const char *filename)  {
   ifstream file(filename);			// test file existence
   return file;
 }
 
-void openFiles(string name, filereader &fp, filereader &index, filereader &available)  {
+void openFiles(string name, fstream &fp, fstream &index, fstream &available)  {
 
-	if (file_test(name))  {			// Method for opening files or creating them.
-		fp.open(name, 'a');
-//		cout << name << " was opened for writing\n";
-	}
+	if (fileTest(name))
+		fp.open(name, ios::binary|ios::in|ios::out);
 	else  {
-		fp.open(name, 'w');
-//		cout << name << " was CREATED for writing\n";
-	}
-	
-	if (file_test(INDEX_FILE))  {
-		index.open(INDEX_FILE, 'r');
-//		cout << "Index.db was opened.\n";
-	}
-	else  {
-		index.open(INDEX_FILE, 'w');
-//		cout << "Index.db was CREATED.\n";
+		fstream t(name);
+		t.open(name, ios::out);
+		t.flush();
+		t.close();
+		fp.open(name, ios::binary|ios::in|ios::out);
 	}
 
-	if (file_test(AVAIL_FILE))  {
-		available.open(AVAIL_FILE, 'r');
-//		cout << "Avail.db was opened.\n";
-	}
+	if (fileTest(INDEX_FILE.c_str()))
+		index.open(INDEX_FILE, ios::binary|ios::in|ios::out);
 	else  {
-		available.open(AVAIL_FILE, 'w');
-//		cout << "Avail.db was CREATED.\n";
+		fstream t(INDEX_FILE);
+		t.open(INDEX_FILE, ios::out);
+		t.flush();
+		t.close();
+		index.open(INDEX_FILE, ios::binary|ios::in|ios::out);
+	}
+
+	if (fileTest(AVAIL_FILE.c_str()))
+		available.open(AVAIL_FILE, ios::binary|ios::in|ios::out);
+	else  {
+		fstream t(AVAIL_FILE);
+		t.open(AVAIL_FILE, ios::out);
+		t.flush();
+		t.close();
+		available.open(AVAIL_FILE), ios::binary|ios::in|ios::out;
 	}
 }
 
-void readSupportStructures(filereader &index_file, vector<file_index> &index_list, 
-	filereader &available_file, vector<avail_list> &available_list)  {
+void readSupportStructures(fstream &index_file, vector<file_index> &index_list, 
+	fstream &available_file, vector<avail_list> &available_list)  {
 
 	file_index findex;							// structure to add to vector
 	avail_list alist;							// structure to add to vector
-	int index_end = fileSize(INDEX_FILE);		// file size of index file
-	int avail_end = fileSize(AVAIL_FILE);		// file size of availability vector file
+	int index_end = fileSize(INDEX_FILE.c_str());		// file size of index file
+	int avail_end = fileSize(AVAIL_FILE.c_str());		// file size of availability vector file
 	int growth = sizeof(int) + sizeof(long);	// offset growth of two data elements.
 	int key = 0;								// key value to read
 	int off = 0;								// offset value to read
 	int size = 0;								// size value to read
 
 	for (int i = 0; i < index_end; i += growth)  {
-		index_file.read_raw((char*) &key, sizeof(int));		// read key value
-		index_file.read_raw((char*) &off, sizeof(long));	// read offset value
+		index_file.read((char*) &key, sizeof(int));		// read key value
+		index_file.read((char*) &off, sizeof(long));	// read offset value
 //		cout << "Adding Key: " << key << "\t\tOffset: " << off << "\n";
 		findex.key = key;									// set struct value for in memory vector
 		findex.off = off;									// set struct value for in memory vector
@@ -283,15 +306,13 @@ void readSupportStructures(filereader &index_file, vector<file_index> &index_lis
 	}
 
 	for (int i = 0; i < avail_end; i += growth)  {
-		available_file.read_raw((char*) &off, sizeof(int));		// read offset value
-		available_file.read_raw((char*) &size, sizeof(long));	// read size value
+		available_file.read((char*) &off, sizeof(int));		// read offset value
+		available_file.read((char*) &size, sizeof(long));	// read size value
 		alist.off = off;										// set struct value for in memory vector
 		alist.size = size;										// set struct value for in memory vector
 		available_list.push_back(alist);						// add struct to vector
 //		cout << "Added record " << i << " to availability vector\n";
 	}
-	index_file.close();
-	available_file.close();
 /*
 	// DEBUG CODE -- prints values added to the vectors
 	for (vector<file_index>::const_iterator i = index_list.begin(); i != index_list.end(); i++)  {
@@ -316,7 +337,7 @@ int fileSize(const char* name) {
   return static_cast<int>(file.tellg() - begin_pos);			// return difference of positions
 }
 
-bool index_cmp(const file_index& a, const file_index& b)  {
+bool indexCmp(const file_index& a, const file_index& b)  {
 	// This method defines the "<" operator for our index struct and allows for "sort" 
 	//		to be called on vectors.  If we wanted to sort the avail list, we would need to do the same
 	//		but I don't think we are supposed to sort avail.
