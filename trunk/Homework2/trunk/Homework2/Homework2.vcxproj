@@ -60,12 +60,10 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="filereader.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="str.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="filereader.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="str.h" />
   </ItemGroup>
